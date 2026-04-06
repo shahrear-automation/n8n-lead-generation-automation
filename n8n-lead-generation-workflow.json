@@ -1,0 +1,421 @@
+{
+  "name": "LeadFinder",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -864,
+        -208
+      ],
+      "id": "54a55931-ca17-4752-84ba-5655fc69b662",
+      "name": "Inbound – Telegram Command",
+      "webhookId": "b0d07042-7cef-4ba0-b26e-00516670719e",
+      "credentials": {
+        "telegramApi": {
+          "id": "bBctOutlfpmSoE0H",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "sender": "=projects.shahrearbinsatter@gmail.com|utsab_shobdo@yahoo.com"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -864,
+        64
+      ],
+      "id": "50efeba1-2d2c-498a-baec-e400cc8409f9",
+      "name": "Inbound – Email Request",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BjPezfuDDVkp7Qs",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "You are a router for a Telegram bot.\n\nReturn ONLY valid JSON (no markdown, no code fences).\n\nIf the user asks to find businesses/companies/shops/agencies in a place and wants contacts, set:\nintent=\"lead\"\nExtract:\n- industry (short phrase)\n- location (city/area/country if relevant)\n- limit (default 10 if not specified)\nSet answer=\"N/A\"\n\nIf the user asks for top lists, explanations, definitions, comparisons, or general information (e.g., \"top 5 universities in Bangladesh\"), set:\nintent=\"info\"\nSet industry=\"N/A\", location=\"N/A\"\nProvide a helpful short answer in \"answer\"\nlimit=5 if user says top 5, else 10.\n\nJSON schema:\n{\"intent\":\"lead|info\",\"industry\":\"...\",\"location\":\"...\",\"limit\":10,\"answer\":\"...\"}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -512,
+        -80
+      ],
+      "id": "015ed796-837a-4f46-816c-5843b385f506",
+      "name": "LLM – Gemini Processing Model"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        176
+      ],
+      "id": "1436f136-9433-40f6-a143-d6247544f1bf",
+      "name": "LLM – Gemini Processing Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Ah5XUGv2CELQGen7",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.output || \"\").trim();\n\n// \"json\" prefix থাকলে বাদ দাও\nconst cleaned = raw.startsWith(\"json\")\n  ? raw.replace(/^json\\s*/i, \"\")\n  : raw;\n\n// Parse\nlet parsed;\ntry {\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  // fallback: empty\n  parsed = { industry: null, location: null, limit: null };\n}\n\nreturn [{ ...parsed }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        -80
+      ],
+      "id": "a4cf338e-7f95-477b-916e-e6cd3db323b8",
+      "name": "Parser – AI JSON Normalizer"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "edf0a7f3-9b43-4f5a-8749-9bab4e3dcbed",
+              "name": "query",
+              "value": "={{$json.industry}} in {{$json.location}}",
+              "type": "string"
+            },
+            {
+              "id": "81cc7a81-0f12-4ff1-95c9-d509396f9c47",
+              "name": "limit",
+              "value": "={{$json.limit}}",
+              "type": "number"
+            },
+            {
+              "id": "c8ec84c3-ab64-4baa-a3af-14c0f28dd45a",
+              "name": "location",
+              "value": "={{ $json.location }}",
+              "type": "string"
+            },
+            {
+              "id": "74f7a1fb-d6d4-41fc-b155-e6ffa0e2c412",
+              "name": "industry",
+              "value": "={{ $json.industry }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        32,
+        -80
+      ],
+      "id": "e891d3dd-3630-4e68-a0ee-e93280e0b628",
+      "name": "Builder – Query Constructor"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "42ca26b9-f6b5-4b36-8f3d-934a0ad37dcd",
+              "leftValue": "={{ $('Parser – AI JSON Normalizer').item.json.intent }}",
+              "rightValue": "lead",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        240,
+        -80
+      ],
+      "id": "8db438c5-7f49-448c-bbf9-7447e57d0f75",
+      "name": "Router – Lead vs Info Decision"
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorSource": "store",
+        "actorId": {
+          "__rl": true,
+          "value": "nwua9Gu5YrADL7ZDj",
+          "mode": "list",
+          "cachedResultName": "Google Maps Scraper (compass/crawler-google-places)",
+          "cachedResultUrl": "https://console.apify.com/actors/nwua9Gu5YrADL7ZDj/input"
+        },
+        "customBody": "={\n  \"searchStringsArray\": [\"{{ $json.query }}\"],\n  \"maxCrawledPlacesPerSearch\": {{ $json.limit }}\n}",
+        "timeout": {}
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -96
+      ],
+      "id": "5ef2acc6-e8a0-4c58-9204-620194122dd5",
+      "name": "Data Source – Google Maps Scraper",
+      "credentials": {
+        "apifyApi": {
+          "id": "bSE3lqleD3tesr1p",
+          "name": "Apify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = items.map(i => i.json);\n\nconst title = (leads?.[0]?.searchString || \"Google Maps Leads\").replace(/\\s+/g, ' ').trim();\nconst now = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Dhaka' });\n\nconst rows = leads.map((d, idx) => {\n  const name = d.title || \"N/A\";\n  const phone = d.phone || \"N/A\";\n  const website = d.website || \"N/A\";\n  const address = d.address || \"N/A\";\n  return `\n    <div class=\"card\">\n      <div class=\"top\">\n        <div class=\"idx\">${idx + 1}</div>\n        <div class=\"name\">${name}</div>\n      </div>\n      <div class=\"addr\">${address}</div>\n      <div class=\"grid\">\n        <div class=\"pill\"><span>Phone</span><b>${phone}</b></div>\n        <div class=\"pill\"><span>Website</span><b>${website === \"N/A\" ? \"N/A\" : website}</b></div>\n      </div>\n    </div>\n  `;\n}).join(\"\");\n\nconst html = `<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\" />\n<title>Leads Report</title>\n<style>\n  @page { size: A4; margin: 18mm; }\n  body { font-family: Arial, sans-serif; color:#111; }\n  .header { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 14px; }\n  .h1 { font-size: 18px; font-weight: 700; margin:0; }\n  .meta { font-size: 11px; color:#444; margin-top:6px; }\n  .badge { font-size: 11px; padding:6px 10px; border:1px solid #ddd; border-radius: 999px; background:#fafafa; }\n  .cards { display:flex; flex-direction:column; gap:10px; }\n  .card { border:1px solid #e6e6e6; border-radius: 12px; padding:12px; background:#fff; }\n  .top { display:flex; align-items:center; gap:10px; }\n  .idx { width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#111; color:#fff; font-size:12px; }\n  .name { font-size: 14px; font-weight: 700; }\n  .addr { margin-top:6px; font-size: 11px; color:#555; line-height: 1.35; }\n  .grid { margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:10px; }\n  .pill { border:1px dashed #ddd; border-radius: 10px; padding:10px; background:#fcfcfc; }\n  .pill span { display:block; font-size:10px; color:#666; margin-bottom:4px; text-transform: uppercase; letter-spacing: .06em; }\n  .pill b { font-size: 12px; word-break: break-word; }\n  .footer { margin-top: 14px; padding-top: 10px; border-top: 1px solid #eee; font-size: 10px; color:#666; }\n</style>\n</head>\n<body>\n  <div class=\"header\">\n    <div>\n      <div class=\"h1\">${title} — Leads Report</div>\n      <div class=\"meta\">Generated: ${now} (Dhaka) • Source: Google Maps</div>\n    </div>\n    <div class=\"badge\">Total: ${leads.length} leads</div>\n  </div>\n\n  <div class=\"cards\">\n    ${rows}\n  </div>\n\n  <div class=\"footer\">\n    Note: Emails usually are not available on Google Maps. If needed, we can enrich emails from websites in the next step.\n  </div>\n</body>\n</html>`;\n\nreturn [{ html }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -96
+      ],
+      "id": "ae43ec4c-e755-4cb7-941f-9e2ec60408a2",
+      "name": "Formatter – Lead Report Generator"
+    },
+    {
+      "parameters": {
+        "html_content": "={{$json.html}}",
+        "output_format": "file",
+        "output_filename": "={{ \n  'Leads_' + \n  ($node[\"Builder – Query Constructor\"].json.industry || 'Search').replace(/[^a-z0-9]+/gi,'_') + '_' +\n  ($node[\"Builder – Query Constructor\"].json.location || 'Global').replace(/[^a-z0-9]+/gi,'_') + '_' +\n  new Date().toISOString().slice(0,10) +\n  '.pdf'\n}}"
+      },
+      "type": "n8n-nodes-htmlcsstopdf.htmlcsstopdf",
+      "typeVersion": 1,
+      "position": [
+        928,
+        -96
+      ],
+      "id": "cdae3f09-32c9-46c9-be6b-d69562c77dc3",
+      "name": "Exporter – PDF Report Engine",
+      "credentials": {
+        "htmlcsstopdfApi": {
+          "id": "FJqLDsTfvAbKJNHG",
+          "name": "HTML to PDF account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{$node[\"Inbound – Telegram Command\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        -96
+      ],
+      "id": "d8c425a4-a6e1-4e47-89c0-f34e77fd6688",
+      "name": "Outbound – Telegram PDF Delivery",
+      "webhookId": "a0a3f15f-cac7-4999-a591-0f227b164886",
+      "credentials": {
+        "telegramApi": {
+          "id": "bBctOutlfpmSoE0H",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{$node[\"Inbound – Telegram Command\"].json[\"message\"][\"chat\"][\"id\"]}}",
+        "text": "={{ $('Parser – AI JSON Normalizer').item.json.answer }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        288
+      ],
+      "id": "4ae6b503-d113-485f-844c-520c8d0cfa67",
+      "name": "Outbound – Telegram Info Response",
+      "webhookId": "a0a3f15f-cac7-4999-a591-0f227b164886",
+      "credentials": {
+        "telegramApi": {
+          "id": "bBctOutlfpmSoE0H",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Inbound – Telegram Command": {
+      "main": [
+        [
+          {
+            "node": "LLM – Gemini Processing Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inbound – Email Request": {
+      "main": [
+        [
+          {
+            "node": "LLM – Gemini Processing Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM – Gemini Processing Model": {
+      "main": [
+        [
+          {
+            "node": "Parser – AI JSON Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM – Gemini Processing Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM – Gemini Processing Model",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser – AI JSON Normalizer": {
+      "main": [
+        [
+          {
+            "node": "Builder – Query Constructor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Builder – Query Constructor": {
+      "main": [
+        [
+          {
+            "node": "Router – Lead vs Info Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router – Lead vs Info Decision": {
+      "main": [
+        [
+          {
+            "node": "Data Source – Google Maps Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Outbound – Telegram Info Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Source – Google Maps Scraper": {
+      "main": [
+        [
+          {
+            "node": "Formatter – Lead Report Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatter – Lead Report Generator": {
+      "main": [
+        [
+          {
+            "node": "Exporter – PDF Report Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exporter – PDF Report Engine": {
+      "main": [
+        [
+          {
+            "node": "Outbound – Telegram PDF Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "67b377ed-ef1f-4187-a278-27c6235fccce",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b38568f45c032e05142dcfa8ed26e63e163bf19fd6865373a0cfcc76d5e699e2"
+  },
+  "id": "ijSA4vDLyWHPEyLf",
+  "tags": []
+}
